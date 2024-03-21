@@ -18,5 +18,6 @@ public class Book implements Serializable {
   @Id
   private UUID id;
   private String title;
+  private String isbn;
 
 }

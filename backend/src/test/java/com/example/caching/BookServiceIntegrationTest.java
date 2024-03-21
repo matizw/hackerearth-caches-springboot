@@ -1,5 +1,6 @@
 package com.example.caching;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,66 +35,60 @@ public class BookServiceIntegrationTest {
   private static final UUID FOUNDATION_ID = UUID.randomUUID();
   private static final UUID DUNE_ID = UUID.randomUUID();
 
+  private static final String I_ROBOT_ISBN = "ROBOT-ISBN";
+  private static final String FOUNDATION_ISBN = "FOUNDATION-ISBN";
+  private static final String DUNE_ISBN = "DUNE-ISBN";
+
   @BeforeEach
   void setUp() {
-    service.save(new Book(DUNE_ID, "Dune"));
-    service.save(new Book(I_ROBOT_ID, "I, Robot"));
-    service.save(new Book(FOUNDATION_ID, "Foundation"));
+    service.save(new Book(DUNE_ID, "Dune", DUNE_ISBN));
+    service.save(new Book(I_ROBOT_ID, "I, Robot", I_ROBOT_ISBN));
+    service.save(new Book(FOUNDATION_ID, "Foundation", FOUNDATION_ISBN));
   }
 
   @Test
   void givenBookThatShouldBeCached_whenFindByTitle_thenResultShouldBePutInCache() {
     Optional<Book> dune = service.findFirstByTitle("Dune");
-
-    assertEquals(dune, getCachedBook("Dune"));
-  }
-
-  @Test
-  void givenBookThatShouldNotBeCached_whenFindByTitle_thenResultShouldNotBePutInCache() {
-    service.findFirstByTitle("Foundation");
-
-    assertEquals(empty(), getCachedBook("Foundation"));
-  }
-
-  @Test
-  void givenBookThatShouldBeCached_whenFindByTitle_thenResultShouldBePutInCache2() {
+    Optional<Book> foundation = service.findFirstByTitle("Foundation");
     Optional<Book> robot = service.findFirstByTitle("I, Robot");
-
+    assertEquals(dune, getCachedBook("Dune"));
+    assertEquals(foundation, getCachedBook("Foundation"));
     assertEquals(robot, getCachedBook("I, Robot"));
   }
 
 
   @Test
-  void givenBookThatShouldBeCached_whenFindByTitle_thenResultShouldBeUpdateInCache2() {
-    service.update(new Book(I_ROBOT_ID, "I, Robot 2"));
-
+  void givenBookThatShouldBeCached_whenFindByTitle_thenResultShouldBeUpdatedInCache() {
     Optional<Book> dune = service.findFirstByTitle("Dune");
+    Optional<Book> foundation = service.findFirstByTitle("Foundation");
     Optional<Book> robot = service.findFirstByTitle("I, Robot");
-    Optional<Book> found = service.findFirstByTitle("Foundation");
-    Optional<Book> robot2 = service.findFirstByTitle("I, Robot 2");
-
-
+    assertEquals(robot, getCachedBook("I, Robot") );
+    Book updated = service.update(new Book(I_ROBOT_ID, "I, Robot", "NEW-ISBN"));
     assertEquals(dune, getCachedBook("Dune"));
-    assertEquals(empty(), getCachedBook("I, Robot"));
-    assertEquals(empty(), getCachedBook("Foundation"));
-    assertEquals(robot2, getCachedBook("I, Robot 2") );
+    assertEquals(foundation, getCachedBook("Foundation"));
+    assertEquals(Optional.of(updated), getCachedBook("I, Robot") );
   }
 
   @Test
-  void givenBookThatShouldBeCached_whenFindByTitle_thenResultShouldBeDeleteInCache2() {
+  void givenBookThatShouldBeCached_whenFindByTitle_thenResultShouldBeEvictedInCache() {
     Optional<Book> dune = service.findFirstByTitle("Dune");
     Optional<Book> robot = service.findFirstByTitle("I, Robot");
-    Optional<Book> found = service.findFirstByTitle("Foundation");
+    Optional<Book> foundation = service.findFirstByTitle("Foundation");
 
-    service.delete(new Book(DUNE_ID, "Dune"));
+    service.delete(new Book(DUNE_ID, "Dune", DUNE_ISBN));
 
     assertEquals(empty(), getCachedBook("Dune"));
     assertEquals(robot, getCachedBook("I, Robot"));
-    assertEquals(empty(), getCachedBook("Foundation"));
+    assertEquals(foundation, getCachedBook("Foundation"));
   }
 
 
   private Optional<Book> getCachedBook(String title) {
     return ofNullable(cacheManager.getCache("books")).map(c -> c.get(title, Book.class));
+  }
+
+  @AfterEach
+  void clear() {
+    cacheManager.getCache("books").clear();
   }
 }
